@@ -1,0 +1,48 @@
+# Plates & Progress — SaaS starter
+
+Web app with accounts, synced data, and a paid Pro tier. Deploy time: ~30–45 min.
+
+## 1. Supabase (accounts + database) — free tier is fine
+
+1. Go to supabase.com → New project.
+2. Project → SQL Editor → New query → paste the contents of `schema.sql` → Run.
+3. Project → Settings → API → copy your **Project URL** and **anon public key**.
+4. Open `index.html` and paste them into `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the top of the `<script>` tag.
+5. Settings → Authentication → make sure "Enable email confirmations" is on (default) or off if you want instant sign-in during testing.
+
+## 2. Stripe (payments) — no code needed for the basic version
+
+1. Go to dashboard.stripe.com → Products → add a product, e.g. "Pro" at $4.99/month (recurring).
+2. Payment Links → create a link for that product.
+3. Copy the link and paste it into `STRIPE_PAYMENT_LINK` in `index.html`.
+4. Developers → Webhooks → Add endpoint. You'll fill in the URL after deploying (step 3 below) — it'll be `https://your-app.vercel.app/api/stripe-webhook`. Select the event `checkout.session.completed` (and `customer.subscription.deleted` if you want cancellations to revoke access).
+5. Copy the **webhook signing secret** (starts with `whsec_`) and your **secret key** (starts with `sk_`) — you'll need both for step 3.
+
+## 3. Deploy to Vercel (free tier is fine)
+
+1. Push this folder to a GitHub repo.
+2. Go to vercel.com → New Project → import the repo.
+3. Under Environment Variables, add:
+   - `STRIPE_SECRET_KEY` = your Stripe secret key
+   - `STRIPE_WEBHOOK_SECRET` = the webhook signing secret from step 2.4
+   - `SUPABASE_URL` = same project URL as above
+   - `SUPABASE_SERVICE_ROLE_KEY` = Supabase → Settings → API → **service_role** key (different from the anon key — keep this one secret, never put it in index.html)
+4. Deploy. Vercel gives you a live URL like `https://your-app.vercel.app`.
+5. Go back to Stripe's webhook setup and paste in the real URL: `https://your-app.vercel.app/api/stripe-webhook`.
+
+## 4. Test it
+
+1. Visit your Vercel URL, create an account, log a workout.
+2. Click "Upgrade to Pro" — use Stripe's test card `4242 4242 4242 4242` if you're still in test mode.
+3. Check your Supabase `profiles` table — `is_pro` should flip to `true` within a few seconds.
+
+## What's already handled
+- Per-user accounts and data isolation (Row Level Security in `schema.sql`)
+- Free tier limited to last 5 sessions; Pro unlocks full history
+- Stripe → Supabase sync via the webhook, so Pro unlocks automatically after payment
+
+## What you'll likely want to add next
+- Password reset flow (Supabase supports this out of the box, just needs a UI)
+- A real progress chart on the synced version (the local-only version I built earlier has one — port it over)
+- Terms of service / privacy policy page (Stripe requires a working link to these before you can go live)
+- Move Stripe out of test mode when ready to charge real cards
