@@ -1,0 +1,44 @@
+-- Run this in Supabase: Project > SQL Editor > New query > Run
+
+-- One row per user, tracks Pro status
+create table profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  is_pro boolean default false,
+  stripe_customer_id text,
+  created_at timestamptz default now()
+);
+
+-- Workout sessions
+create table workouts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  date date not null,
+  exercises jsonb not null,
+  created_at timestamptz default now()
+);
+
+-- Auto-create a profile row whenever someone signs up
+create function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email) values (new.id, new.email);
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- Row Level Security: users can only touch their own data
+alter table profiles enable row level security;
+alter table workouts enable row level security;
+
+create policy "Users can view own profile" on profiles
+  for select using (auth.uid() = id);
+create policy "Users can update own profile" on profiles
+  for update using (auth.uid() = id);
+
+create policy "Users can manage own workouts" on workouts
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
